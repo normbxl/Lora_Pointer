@@ -98,7 +98,7 @@ void low_energy()
         ttgo->startLvglTick();
         ttgo->displayWakeup();
         ttgo->rtc->syncToSystem();
-        updateStepCounter(ttgo->bma->getCounter());
+        //updateStepCounter(ttgo->bma->getCounter());
         updateBatteryLevel();
         updateBatteryIcon(LV_ICON_CALCULATION);
         lv_disp_trig_activity(NULL);

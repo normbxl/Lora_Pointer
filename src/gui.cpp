@@ -25,12 +25,12 @@ Created by Lewis he on October 10, 2019.
 LV_FONT_DECLARE(Geometr);
 LV_FONT_DECLARE(Ubuntu);
 LV_IMG_DECLARE(bg);
-LV_IMG_DECLARE(bg1);
-LV_IMG_DECLARE(bg2);
-LV_IMG_DECLARE(bg3);
-LV_IMG_DECLARE(WALLPAPER_1_IMG);
-LV_IMG_DECLARE(WALLPAPER_2_IMG);
-LV_IMG_DECLARE(WALLPAPER_3_IMG);
+//LV_IMG_DECLARE(bg1);
+//LV_IMG_DECLARE(bg2);
+//LV_IMG_DECLARE(bg3);
+//LV_IMG_DECLARE(WALLPAPER_1_IMG);
+//LV_IMG_DECLARE(WALLPAPER_2_IMG);
+//LV_IMG_DECLARE(WALLPAPER_3_IMG);
 LV_IMG_DECLARE(step);
 LV_IMG_DECLARE(menu);
 
@@ -120,11 +120,12 @@ public:
         _array[4].icon = lv_img_create(_bar, NULL);
         lv_img_set_src(_array[4].icon, LV_SYMBOL_GPS);
         lv_obj_set_hidden(_array[4].icon, true);
+        lv_obj_align(_array[4].icon, _array[3].icon, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
 
         //step counter
         _array[5].icon = lv_img_create(_bar, NULL);
         lv_img_set_src(_array[5].icon, &step);
-        lv_obj_align(_array[5].icon, _bar, LV_ALIGN_IN_LEFT_MID, 10, 0);
+        lv_obj_align(_array[5].icon, _array[4].icon, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
 
         _array[6].icon = lv_label_create(_bar, NULL);
         lv_label_set_text(_array[6].icon, "0");
@@ -325,18 +326,21 @@ MenuBar::lv_menu_config_t _cfg[] = {
 
 class Compass {
     private:
-    lv_obj_t* canvas = nullptr;
+    lv_obj_t* line = nullptr;
     lv_obj_t* distanceLabel = nullptr;
-    lv_color_t* buffer;
+    
     lv_point_t arrowPoints[4]; 
     int16_t width, height;
     lv_point_t center;
     bool visible;
-    lv_draw_rect_dsc_t rect_dsc;
     
+    lv_style_t lineStyle;
+    lv_style_t fontStyle;
+
 
     /// Rotate points with degree around center-pointer center
     void rotatePoints(const lv_point_t* srcPoints, lv_point_t* dstPoints, uint8_t num_points, float degree) {
+        
         float rot= degree/180.0f * PI;
         float sin_fac = sinf(rot);
         float cos_fac = cosf(rot);
@@ -345,10 +349,12 @@ class Compass {
             dstPoints[i].x = (lv_coord_t)(cos_fac * (float)(srcPoints[i].x - center.x) - sin_fac * (float)(srcPoints[i].y-center.y)) + center.x;
             dstPoints[i].y = (lv_coord_t)(sin_fac * (float)(srcPoints[i].x - center.x) + cos_fac * (float)(srcPoints[i].y-center.y)) + center.y;
         }
+        
     }
 
     float calculateDistance(float flat1, float flon1, float flat2, float flon2) {
         float dist_calc=0;
+        
         float dist_calc2=0;
         float diflat=0;
         float diflon=0;
@@ -370,12 +376,13 @@ class Compass {
 
         dist_calc*=6371000.0f; //Converting to meters
         //Serial.println(dist_calc);
+        
         return dist_calc;  
     }
     //! Get direction in degrees
     float calculateDirection(float otherLatitude, float otherLongitude, float myLatitude, float myLongitude) {
         float x, y;
-
+        
         otherLatitude = otherLatitude * PI / 180.f;
         otherLongitude = otherLongitude * PI / 180.f;
         myLatitude = myLatitude * PI / 180.f;
@@ -383,66 +390,68 @@ class Compass {
 
         y = sinf(otherLongitude - myLongitude) * cosf(otherLatitude);
         x = cosf(myLatitude) * sinf(otherLatitude) - sinf(myLatitude) * cosf(otherLatitude) * cosf(otherLongitude - myLongitude);
-
+        
         return atan2f(y, x) * 180.f / PI;
     }
 
     public:
     Compass(int16_t w, int16_t h) {
-        static lv_style_t style;
+        
         visible=false;
         width=w;
         height=h;
         center.x=w/2;
         center.y=h/2;
+    }
 
-        buffer = new lv_color_t[LV_CANVAS_BUF_SIZE_ALPHA_2BIT(width, height)];
+    void Init() {
+        int16_t m = height/2;
+        
+        lv_style_init(&lineStyle);
+        lv_style_init(&fontStyle);
+        
+        lv_style_set_line_width(&lineStyle, LV_STATE_DEFAULT, 4);
+        lv_style_set_line_color(&lineStyle, LV_STATE_DEFAULT, LV_COLOR_WHITE);
+        
+        lv_style_set_text_color(&fontStyle, LV_OBJ_PART_MAIN, LV_COLOR_GRAY);
+        lv_style_set_text_font(&fontStyle, LV_BTN_PART_MAIN,  &Geometr);
 
-        lv_draw_rect_dsc_init(&rect_dsc);
+        line = lv_line_create(lv_scr_act(), NULL);
+        lv_obj_add_style(line, LV_STATE_DEFAULT, &lineStyle);
         
-        lv_style_init(&style);
-        
-        lv_style_set_image_recolor(&style, LV_STATE_DEFAULT, LV_COLOR_WHITE);
-        lv_style_set_image_recolor_opa(&style, LV_STATE_DEFAULT, LV_OPA_COVER);
-        lv_style_set_text_color(&style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE);
-        lv_style_set_text_font(&style, LV_BTN_PART_MAIN,  &Geometr);
-        
-        canvas = lv_canvas_create(lv_scr_act(), NULL);
-        lv_canvas_set_buffer(canvas, buffer, width, height, LV_IMG_CF_ALPHA_2BIT);
-        lv_obj_add_style(canvas, LV_CANVAS_PART_MAIN, &style);
-        h = h/2;
         // polygon points for drawing arrow pointing north
         arrowPoints[0].x = width/2;         arrowPoints[0].y=3;
-        arrowPoints[1].x = width/2 + 8;    arrowPoints[1].y=h-5;
-        arrowPoints[2].x = width/2;         arrowPoints[2].y=h-10;
-        arrowPoints[3].x = width/2 - 8;    arrowPoints[3].y=h-5;
+        arrowPoints[1].x = width/2 + 8;    arrowPoints[1].y=m-5;
+        arrowPoints[2].x = width/2;         arrowPoints[2].y=m-10;
+        arrowPoints[3].x = width/2 - 8;    arrowPoints[3].y=m-5;
 
-        lv_obj_align(canvas, NULL, LV_ALIGN_CENTER ,0, 20);
+        lv_obj_align(line, NULL, LV_ALIGN_CENTER ,0, 10);
 
-        lv_obj_set_hidden(canvas, true);
+        lv_obj_set_hidden(line, true);
 
         distanceLabel = lv_label_create(lv_scr_act(), NULL);
-        lv_obj_add_style(distanceLabel, LV_LABEL_PART_MAIN, &style);
-        lv_obj_align(distanceLabel, canvas, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_add_style(distanceLabel, LV_LABEL_PART_MAIN, &fontStyle);
+        lv_obj_align(distanceLabel, line, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
         lv_obj_set_hidden(distanceLabel, true);
        
     };
 
-    ~Compass() {
-        delete[] buffer;
-    };
-
     void show() {
         visible=true;
-        lv_obj_set_hidden(canvas, false);
+        
+        lv_obj_set_hidden(line, false);
         lv_obj_set_hidden(distanceLabel, false);
+        
     }
     void hide() {
         visible=false;
-        lv_obj_set_hidden(canvas, true);
+        
+        lv_obj_set_hidden(line, true);
         lv_obj_set_hidden(distanceLabel, true);
+        
     }
     void update() {
+        
         static GpsPosition_t myPosition;
         static GpsPosition_t otherPosition;
         char distanceStr[12];
@@ -451,6 +460,7 @@ class Compass {
             return;
         
         Tracking* tracker=Tracking::instance();
+        
         if (!tracker->isEnabled()) {
             lv_label_set_text(distanceLabel, "Tracker off");
         }
@@ -476,12 +486,12 @@ class Compass {
 
             
             rotatePoints(arrowPoints, points, 4, direction);
-            lv_canvas_draw_polygon(canvas, points, 4, &rect_dsc);
+            lv_line_set_points(line, arrowPoints, 4);
 
             lv_label_set_text(distanceLabel, distanceStr);
         }
 
-        lv_obj_align(distanceLabel, canvas, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_align(distanceLabel, line, LV_ALIGN_CENTER, 0, 0);
         
     }
 };
@@ -489,7 +499,7 @@ class Compass {
 
 MenuBar menuBars;
 StatusBar bar;
-Compass compass(200,200);
+Compass compass(130,130);
 
 static void event_handler(lv_obj_t *obj, lv_event_t event)
 {
@@ -520,12 +530,13 @@ void setupGui()
 
 
     //Create wallpaper
-    void *images[] = {(void *) &bg, (void *) &bg1, (void *) &bg2, (void *) &bg3 };
+    //void *images[] = {(void *) &bg, (void *) &bg1, (void *) &bg2, (void *) &bg3 };
     lv_obj_t *scr = lv_scr_act();
     lv_obj_t *img_bin = lv_img_create(scr, NULL);  /*Create an image object*/
     srand((int)time(0));
-    int r = rand() % 4;
-    lv_img_set_src(img_bin, images[r]);
+    
+    //lv_img_set_src(img_bin, images[r]);
+    lv_img_set_src(img_bin, &bg);
     lv_obj_align(img_bin, NULL, LV_ALIGN_CENTER, 0, 0);
 
     //! bar
@@ -584,11 +595,13 @@ void setupGui()
     lv_obj_align(menuBtn, mainBar, LV_ALIGN_OUT_BOTTOM_MID, 0, -70);
     lv_obj_set_event_cb(menuBtn, event_handler);
 
+    tracker = Tracking::instance();
+    
     lv_task_create(lv_update_task, 1000, LV_TASK_PRIO_LOWEST, NULL);
     lv_task_create(lv_battery_task, 30000, LV_TASK_PRIO_LOWEST, NULL);
 
-    tracker = Tracking::instance();
 
+    compass.Init();
 }
 
 void updateStepCounter(uint32_t counter)
@@ -596,7 +609,7 @@ void updateStepCounter(uint32_t counter)
     bar.setStepCounter(counter);
 }
 
-static void switchMainDisplay(bool trackerEnabled) {
+void switchMainDisplay(bool trackerEnabled) {
     if (trackerEnabled) {
         lv_obj_set_hidden(timeLabel, true);
         compass.show();
@@ -647,7 +660,8 @@ void updateBatteryIcon(lv_icon_battery_t icon)
 static void lv_update_task(struct _lv_task_t *data)
 {
     updateTime();
-    //compass.update();
+    tracker->run();
+    compass.update();
 }
 
 static void lv_battery_task(struct _lv_task_t *data)
@@ -1614,6 +1628,7 @@ static void tracking_event_cb()
         delete sw;
         sw = nullptr;
         menuBars.hide(false);
+        switchMainDisplay(tracker->isEnabled());
     });
     sw->align(bar.self(), LV_ALIGN_OUT_BOTTOM_MID);
     sw->setStatus(0, tracker->isEnabled());

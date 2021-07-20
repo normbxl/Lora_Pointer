@@ -20,7 +20,7 @@ typedef struct {
 RfConfig_t rfConfig = {
   frequency_tx: 868100000,
   frequency_rx: 867100000,
-  rf_power: 13,   // ~25 mW, max allowed in this band
+  rf_power: 12,   // ~22 mW, max 25 mW allowed in this band
   spreading_factor: 7,
   bandwidth: 125
 };
@@ -38,6 +38,7 @@ Tracking::Tracking() :
 {
     myPosition = GpsPosition{ 0.0, 0.0, false};
     remotePosition = GpsPosition{ 0.0, 0.0, false};
+    sipSerial=nullptr;
 }
 
 bool Tracking::setup() {
@@ -46,8 +47,10 @@ bool Tracking::setup() {
     ttgo->enableLDO4();
     ttgo->enableLDO3();
     delay(100);
-
-    sipSerial = new HardwareSerial(1);
+    if (sipSerial==nullptr)
+        sipSerial = new HardwareSerial(1);
+    else 
+        sipSerial->end();
     sipSerial->begin(115200, SERIAL_8N1, GPS_RX, GPS_TX);
     isSetup= sip.begin(*sipSerial);
     return isSetup;
@@ -85,8 +88,12 @@ bool Tracking::initRf(RfConfig_t &rfConfig) {
 }
 
 void Tracking::enable() {
-    if (!isSetup) 
-        setup();
+    if (!isSetup) {
+        if (!setup()) {
+            Serial.println("SIP serial connection failed");
+        }
+
+    }
         
     if (enabled)
         return;
@@ -98,7 +105,7 @@ void Tracking::enable() {
     }
 }
 void Tracking::disable() {
-    enabled= sip.GPSStop()!=S7XG_OK;
+    enabled= !(sip.GPSStop()==S7XG_OK);
 }
 bool Tracking::isEnabled() {
     return enabled;
